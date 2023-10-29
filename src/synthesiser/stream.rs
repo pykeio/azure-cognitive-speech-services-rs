@@ -4,7 +4,7 @@ use std::{
 };
 
 use futures_util::{Stream, StreamExt};
-use simd_json::ValueAccess;
+use simd_json::prelude::*;
 use speech_synthesis::{BlendShape, BlendShapeVisemeFrame, UtteranceEvent, UtteranceEventStream};
 use tokio::net::TcpStream;
 use tokio_tungstenite::{tungstenite::Message, MaybeTlsStream, WebSocketStream};

@@ -11,18 +11,18 @@ repository = "https://github.com/vitri-ent/azure-cognitive-speech-services-rs"
 [dependencies]
 anyhow = "1.0"
 serde = "1.0"
-simd-json = "0.12"
+simd-json = "0.13"
 tokio = { version = "1.32", features = [ "net" ] }
 tokio-tungstenite = { version = "0.20", features = [ "native-tls" ] }
-ssml = "=0.0.4"
+ssml = "=0.0.5"
 async-trait = "0.1"
 thiserror = "1.0"
 tracing = "0.1"
 http = "0.2"
 url = "2.4"
 uuid = { version = "1.4", features = [ "v4", "fast-rng" ] }
-speech-synthesis = "=0.0.2"
+speech-synthesis = "=0.0.4"
 futures-util = { version = "0.3", default-features = false, features = [ "sink", "std" ] }
 
 [dev-dependencies]
-tokio = { version = "1.32", features = [ "net", "macros", "rt" ] }
+tokio = { version = "1.32", features = [ "net", "macros", "rt-multi-thread" ] }
