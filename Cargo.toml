@@ -26,3 +26,4 @@ futures-util = { version = "0.3", default-features = false, features = [ "sink",
 
 [dev-dependencies]
 tokio = { version = "1.32", features = [ "net", "macros", "rt-multi-thread" ] }
+rodio = "0.17"
