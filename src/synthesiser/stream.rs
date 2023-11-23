@@ -9,7 +9,7 @@ use speech_synthesis::{BlendShape, BlendShapeVisemeFrame, UtteranceEvent, Uttera
 use tokio::net::TcpStream;
 use tokio_tungstenite::{tungstenite::Message, MaybeTlsStream, WebSocketStream};
 
-use crate::message::AzureCognitiveSpeechServicesMessage;
+use crate::{message::AzureCognitiveSpeechServicesMessage, Error};
 
 #[rustfmt::skip]
 const AZURE_BLENDSHAPE_KEYS: [&str; 55] = [
@@ -40,7 +40,7 @@ impl AzureCognitiveSpeechServicesSynthesisEventStream {
 }
 
 impl Stream for AzureCognitiveSpeechServicesSynthesisEventStream {
-	type Item = speech_synthesis::Result<UtteranceEvent>;
+	type Item = crate::Result<UtteranceEvent>;
 
 	#[tracing::instrument(skip_all)]
 	fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
@@ -72,22 +72,14 @@ impl Stream for AzureCognitiveSpeechServicesSynthesisEventStream {
 						// we can just end the stream here, the server will close the socket itself
 						Poll::Ready(None)
 					}
-					"audio" => Poll::Ready(Some(Ok(UtteranceEvent::AudioChunk(
-						msg.into_body()
-							.into_binary()
-							.ok_or(anyhow::anyhow!("expected `audio` event to have a binary body"))?
-					)))),
+					"audio" => Poll::Ready(Some(Ok(UtteranceEvent::AudioChunk(msg.into_body().into_binary().ok_or(Error::ExpectedBinary("audio"))?)))),
 					"audio.metadata" => {
 						let data = msg.into_json_abstract()?;
 						let metadata = &data
 							.get_array("Metadata")
-							.ok_or(anyhow::anyhow!("missing `Metadata` field in `audio.metadata` event"))?[0];
-						let meta_type = metadata
-							.get_str("Type")
-							.ok_or(anyhow::anyhow!("missing `Type` field in `audio.metadata` event"))?;
-						let metadata = metadata
-							.get("Data")
-							.ok_or(anyhow::anyhow!("missing `Data` field in `audio.metadata` event"))?;
+							.ok_or(Error::MissingField("Metadata", "`audio.metadata` event"))?[0];
+						let meta_type = metadata.get_str("Type").ok_or(Error::MissingField("Type", "`audio.metadata` event"))?;
+						let metadata = metadata.get("Data").ok_or(Error::MissingField("Data", "`audio.metadata` event"))?;
 
 						let is_boundary = meta_type == "WordBoundary" || meta_type == "SentenceBoundary";
 
@@ -96,16 +88,16 @@ impl Stream for AzureCognitiveSpeechServicesSynthesisEventStream {
 							let from_millis = metadata
 								.get_u64("Offset")
 								.map(|o| o as f32 / 10_000.)
-								.ok_or(anyhow::anyhow!("missing `Offset` field in `audio.metadata` event"))?;
+								.ok_or(Error::MissingField("Offset", "`audio.metadata` event"))?;
 							let to_millis = from_millis
 								+ metadata
 									.get_u64("Duration")
 									.map(|o| o as f32 / 10_000.)
-									.ok_or(anyhow::anyhow!("missing `Duration` field in `audio.metadata` event"))?;
+									.ok_or(Error::MissingField("Duration", "`audio.metadata` event"))?;
 							let text = metadata
 								.get("text")
 								.and_then(|v| v.get_str("Text"))
-								.ok_or(anyhow::anyhow!("missing `Text` field in `audio.metadata` event"))?
+								.ok_or(Error::MissingField("Text", "`audio.metadata` event"))?
 								.to_owned();
 							(Some(from_millis), Some(to_millis), Some(text))
 						} else {
@@ -136,7 +128,7 @@ impl Stream for AzureCognitiveSpeechServicesSynthesisEventStream {
 								}
 								let mut chunk = metadata
 									.get_str("AnimationChunk")
-									.ok_or(anyhow::anyhow!("missing `AnimationChunk` field in `audio.metadata` event"))?
+									.ok_or(Error::MissingField("AnimationChunk", "`audio.metadata` event"))?
 									.to_string();
 								let animation_chunk: AnimationChunk = unsafe { simd_json::from_str(&mut chunk) }?;
 
@@ -165,21 +157,21 @@ impl Stream for AzureCognitiveSpeechServicesSynthesisEventStream {
 					}
 					"response" => {
 						let data = msg.into_json_abstract()?;
-						let audio = data.get("audio").ok_or(anyhow::anyhow!("missing `audio` field in `response` event"))?;
+						let audio = data.get("audio").ok_or(Error::MissingField("audio", "`response` event"))?;
 						debug_assert_eq!(
 							audio
 								.get_str("type")
-								.ok_or(anyhow::anyhow!("missing `type` field in `response` event audio metadata"))?,
+								.ok_or(Error::MissingField("type", "`response` event audio metadata"))?,
 							"inline"
 						);
 
 						// we shouldn't be receiving multiple streams in one request
 						let stream_id = audio
 							.get_str("streamId")
-							.ok_or(anyhow::anyhow!("missing `streamId` field in `response` event audio metadata"))?;
+							.ok_or(Error::MissingField("streamId", "`response` event audio metadata"))?;
 						if let Some(self_stream_id) = &self.stream_id {
 							if self_stream_id != stream_id {
-								return Poll::Ready(Some(Err(anyhow::anyhow!("unexpected multiple streams in request"))));
+								return Poll::Ready(Some(Err(Error::UnexpectedMultipleStreams)));
 							}
 						} else {
 							self.stream_id = Some(stream_id.to_owned());
@@ -203,4 +195,4 @@ impl Stream for AzureCognitiveSpeechServicesSynthesisEventStream {
 	}
 }
 
-impl UtteranceEventStream for AzureCognitiveSpeechServicesSynthesisEventStream {}
+impl UtteranceEventStream<crate::Error> for AzureCognitiveSpeechServicesSynthesisEventStream {}

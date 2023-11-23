@@ -1,4 +1,8 @@
+mod error;
 pub mod message;
 mod synthesiser;
 
-pub use self::synthesiser::{AzureCognitiveSpeechServicesSynthesiser, AzureCognitiveSpeechServicesSynthesiserError};
+pub use self::{
+	error::{Error, Result},
+	synthesiser::AzureCognitiveSpeechServicesSynthesiser
+};

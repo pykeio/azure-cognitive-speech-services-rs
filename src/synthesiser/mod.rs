@@ -1,9 +1,8 @@
 use async_trait::async_trait;
 use futures_util::SinkExt;
-use http::{header::InvalidHeaderValue, HeaderValue};
+use http::HeaderValue;
 use speech_synthesis::{AudioChannels, AudioCodec, AudioContainer, AudioEncoding, AudioFormat, SpeechSynthesiser, UtteranceConfig};
-use ssml::Serialize;
-use thiserror::Error;
+use ssml::{Serialize, SerializeOptions};
 use tokio::net::TcpStream;
 use tokio_tungstenite::tungstenite::{client::IntoClientRequest, handshake::client::Request};
 use url::Url;
@@ -11,16 +10,6 @@ use url::Url;
 mod stream;
 pub use self::stream::AzureCognitiveSpeechServicesSynthesisEventStream;
 use super::message::AzureCognitiveSpeechServicesMessage;
-
-#[derive(Error, Debug)]
-pub enum AzureCognitiveSpeechServicesSynthesiserError {
-	#[error("bad endpoint URL: {0}")]
-	BadEndpointUrl(#[from] url::ParseError),
-	#[error("invalid key: {0}")]
-	InvalidKey(#[from] InvalidHeaderValue),
-	#[error("{0}")]
-	Tungstenite(#[from] tokio_tungstenite::tungstenite::Error)
-}
 
 #[derive(Clone)]
 pub struct AzureCognitiveSpeechServicesSynthesiser {
@@ -32,14 +21,14 @@ unsafe impl Sync for AzureCognitiveSpeechServicesSynthesiser {}
 unsafe impl Send for AzureCognitiveSpeechServicesSynthesiser {}
 
 impl AzureCognitiveSpeechServicesSynthesiser {
-	pub async fn new(region: impl AsRef<str>, key: impl AsRef<str>) -> Result<Self, AzureCognitiveSpeechServicesSynthesiserError> {
+	pub async fn new(region: impl AsRef<str>, key: impl AsRef<str>) -> crate::Result<Self> {
 		Ok(Self {
 			endpoint: Url::parse(&format!("wss://{}.tts.speech.microsoft.com/cognitiveservices/websocket/v1", region.as_ref()))?,
 			key: HeaderValue::from_str(key.as_ref())?
 		})
 	}
 
-	fn build_request(&self) -> Result<Request, AzureCognitiveSpeechServicesSynthesiserError> {
+	fn build_request(&self) -> crate::Result<Request> {
 		let mut request = self.endpoint.clone().into_client_request()?;
 		let headers = request.headers_mut();
 		headers.append("Ocp-Apim-Subscription-Key", self.key.clone());
@@ -50,6 +39,7 @@ impl AzureCognitiveSpeechServicesSynthesiser {
 #[async_trait]
 impl SpeechSynthesiser for AzureCognitiveSpeechServicesSynthesiser {
 	type EventStream = AzureCognitiveSpeechServicesSynthesisEventStream;
+	type Error = crate::Error;
 
 	fn negotiate_audio_format(&self, mut pref: speech_synthesis::AudioFormatPreference) -> Option<AudioFormat> {
 		#[allow(unused)]
@@ -147,13 +137,8 @@ impl SpeechSynthesiser for AzureCognitiveSpeechServicesSynthesiser {
 		}
 	}
 
-	async fn synthesise_ssml_stream(
-		&self,
-		input: ssml::Speak,
-		audio_format: &AudioFormat,
-		config: &UtteranceConfig
-	) -> speech_synthesis::Result<Self::EventStream> {
-		let ssml = input.serialize_to_string(ssml::Flavor::MicrosoftAzureCognitiveSpeechServices)?;
+	async fn synthesise_ssml_stream(&self, input: ssml::Speak, audio_format: &AudioFormat, config: &UtteranceConfig) -> Result<Self::EventStream, Self::Error> {
+		let ssml = input.serialize_to_string(&SerializeOptions::default().flavor(ssml::Flavor::MicrosoftAzureCognitiveSpeechServices))?;
 		let request = self.build_request()?;
 		let addr = request.uri();
 		let socket = TcpStream::connect(format!("{}:{}", addr.host().unwrap(), addr.port_u16().unwrap_or(443))).await?;
@@ -198,29 +183,6 @@ impl SpeechSynthesiser for AzureCognitiveSpeechServicesSynthesiser {
 
 		Ok(AzureCognitiveSpeechServicesSynthesisEventStream::new(request_id, websocket))
 	}
-
-	async fn synthesise_text_stream(
-		&self,
-		text: impl AsRef<str> + Send,
-		audio_format: &AudioFormat,
-		config: &UtteranceConfig
-	) -> speech_synthesis::Result<Self::EventStream> {
-		self.synthesise_ssml_stream(
-			ssml::Speak::new(
-				Some("en-US"),
-				[ssml::voice(
-					config
-						.voice
-						.as_ref()
-						.ok_or_else(|| anyhow::anyhow!("synthesise_text_stream requires a voice to be configured"))?,
-					[text.as_ref()]
-				)]
-			),
-			audio_format,
-			config
-		)
-		.await
-	}
 }
 
 #[cfg(test)]
@@ -230,7 +192,7 @@ mod tests {
 	use super::*;
 
 	#[tokio::test]
-	async fn test_pref() -> anyhow::Result<()> {
+	async fn test_pref() -> crate::Result<()> {
 		let synthesiser = AzureCognitiveSpeechServicesSynthesiser::new("dummy", "dummy").await?;
 		let pref = AudioFormatPreference::default()
 			.with_prefer_containers([AudioContainer::Raw(AudioEncoding::Pcm), AudioContainer::Ogg(AudioCodec::Opus)])
