@@ -7,7 +7,7 @@ use futures_util::{Stream, StreamExt};
 use simd_json::prelude::*;
 use speech_synthesis::{BlendShape, BlendShapeVisemeFrame, UtteranceEvent, UtteranceEventStream};
 use tokio::net::TcpStream;
-use tokio_tungstenite::{tungstenite::Message, MaybeTlsStream, WebSocketStream};
+use tokio_websockets::{MaybeTlsStream, WebSocketStream};
 
 use crate::{message::AzureCognitiveSpeechServicesMessage, Error};
 
@@ -47,17 +47,15 @@ impl Stream for AzureCognitiveSpeechServicesSynthesisEventStream {
 		let msg = self.websocket.poll_next_unpin(cx);
 		match msg {
 			Poll::Ready(Some(msg)) => {
-				let msg: AzureCognitiveSpeechServicesMessage = match msg? {
-					Message::Binary(data) => data.try_into()?,
-					Message::Text(text) => text.parse()?,
-					Message::Close(e) => {
-						tracing::error!("received unexpected close frame: {e:?}");
-						return Poll::Ready(None);
-					}
-					_ => {
-						cx.waker().wake_by_ref();
-						return Poll::Pending;
-					}
+				let msg = msg?;
+				let msg: AzureCognitiveSpeechServicesMessage = if msg.is_binary() {
+					(&*msg.into_payload()).try_into()?
+				} else if msg.is_close() {
+					tracing::error!("received unexpected close frame: {:?}", msg.as_close());
+					return Poll::Ready(None);
+				} else {
+					cx.waker().wake_by_ref();
+					return Poll::Pending;
 				};
 
 				debug_assert_eq!(msg.request_id(), self.request_id);

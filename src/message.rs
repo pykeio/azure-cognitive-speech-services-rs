@@ -6,7 +6,7 @@ use std::{
 
 use serde::de::DeserializeOwned;
 use thiserror::Error;
-use tokio_tungstenite::tungstenite::Message;
+use tokio_websockets::Message;
 use uuid::Uuid;
 
 #[derive(Error, Debug)]
@@ -177,9 +177,9 @@ impl AzureCognitiveSpeechServicesMessage {
 
 	pub fn into_websocket_message(self) -> Message {
 		if matches!(&self.body, AzureCognitiveSpeechServicesMessageBody::Binary(_)) {
-			Message::Binary(self.serialize_binary())
+			Message::binary(bytes::Bytes::from(self.serialize_binary()))
 		} else {
-			Message::Text(self.serialize_text())
+			Message::text(self.serialize_text())
 		}
 	}
 
@@ -293,10 +293,10 @@ impl FromStr for AzureCognitiveSpeechServicesMessage {
 	}
 }
 
-impl TryFrom<Vec<u8>> for AzureCognitiveSpeechServicesMessage {
+impl TryFrom<&[u8]> for AzureCognitiveSpeechServicesMessage {
 	type Error = AzureCognitiveSpeechServicesMessageError;
 
-	fn try_from(value: Vec<u8>) -> Result<Self, AzureCognitiveSpeechServicesMessageError> {
+	fn try_from(value: &[u8]) -> Result<Self, AzureCognitiveSpeechServicesMessageError> {
 		let (int_bytes, rest) = value.split_at(std::mem::size_of::<u16>());
 		let header_len = u16::from_be_bytes([int_bytes[0], int_bytes[1]]) as usize;
 		let headers = std::str::from_utf8(&rest[..header_len])?;

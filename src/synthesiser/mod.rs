@@ -1,10 +1,9 @@
 use async_trait::async_trait;
 use futures_util::SinkExt;
-use http::HeaderValue;
+use http::{HeaderName, HeaderValue};
 use speech_synthesis::{AudioChannels, AudioCodec, AudioContainer, AudioEncoding, AudioFormat, SpeechSynthesiser, UtteranceConfig};
 use ssml::{Serialize, SerializeOptions};
-use tokio::net::TcpStream;
-use tokio_tungstenite::tungstenite::{client::IntoClientRequest, handshake::client::Request};
+use tokio_websockets::ClientBuilder;
 use url::Url;
 
 mod stream;
@@ -28,11 +27,11 @@ impl AzureCognitiveSpeechServicesSynthesiser {
 		})
 	}
 
-	fn build_request(&self) -> crate::Result<Request> {
-		let mut request = self.endpoint.clone().into_client_request()?;
-		let headers = request.headers_mut();
-		headers.append("Ocp-Apim-Subscription-Key", self.key.clone());
-		Ok(request)
+	fn build_client(&self) -> crate::Result<ClientBuilder> {
+		Ok(ClientBuilder::new()
+			.uri(self.endpoint.as_str())
+			.unwrap()
+			.add_header(HeaderName::from_static("ocp-apim-subscription-key"), self.key.clone()))
 	}
 }
 
@@ -139,10 +138,8 @@ impl SpeechSynthesiser for AzureCognitiveSpeechServicesSynthesiser {
 
 	async fn synthesise_ssml_stream(&self, input: ssml::Speak, audio_format: &AudioFormat, config: &UtteranceConfig) -> Result<Self::EventStream, Self::Error> {
 		let ssml = input.serialize_to_string(&SerializeOptions::default().flavor(ssml::Flavor::MicrosoftAzureCognitiveSpeechServices))?;
-		let request = self.build_request()?;
-		let addr = request.uri();
-		let socket = TcpStream::connect(format!("{}:{}", addr.host().unwrap(), addr.port_u16().unwrap_or(443))).await?;
-		let mut websocket = tokio_tungstenite::client_async_tls(request, socket).await?.0;
+		let client_builder = self.build_client()?;
+		let (mut websocket, _response) = client_builder.connect().await?;
 		websocket
 			.send(
 				AzureCognitiveSpeechServicesMessage::builder("speech.config", AzureCognitiveSpeechServicesMessage::gen_request_id())

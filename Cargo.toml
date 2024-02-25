@@ -12,16 +12,25 @@ repository = "https://github.com/vitri-ent/azure-cognitive-speech-services-rs"
 serde = "1.0"
 simd-json = "0.13"
 tokio = { version = "1.32", features = [ "net" ] }
-tokio-tungstenite = { version = "0.21", features = [ "native-tls" ] }
+tokio-websockets = { version = "0.5", features = [ "client" ] }
 ssml = "0.1"
 async-trait = "0.1"
 thiserror = "1.0"
 tracing = "0.1"
 http = "1.0"
 url = "2.4"
+bytes = "1.5"
 uuid = { version = "1.4", features = [ "v4", "fast-rng" ] }
 speech-synthesis = "0.1"
 futures-util = { version = "0.3", default-features = false, features = [ "sink", "std" ] }
+
+[features]
+default = ["tws-rustls-native-roots", "tws-fastrand", "tws-smol-sha1"]
+tws-rustls-native-roots = ["tokio-websockets/rustls-webpki-roots", "tokio-websockets/ring"]
+tws-rustls-webpki-roots = ["tokio-websockets/rustls-native-roots", "tokio-websockets/ring"]
+tws-native = ["tokio-websockets/native-tls"]
+tws-smol-sha1 = ["tokio-websockets/sha1_smol"]
+tws-fastrand = ["tokio-websockets/fastrand"]
 
 [dev-dependencies]
 tokio = { version = "1.32", features = [ "net", "macros", "rt-multi-thread" ] }

@@ -10,7 +10,7 @@ pub enum Error {
 	#[error("invalid key: {0}")]
 	InvalidKey(#[from] InvalidHeaderValue),
 	#[error("websocket error: {0}")]
-	Tungstenite(#[from] tokio_tungstenite::tungstenite::Error),
+	Tungstenite(#[from] tokio_websockets::Error),
 	#[error("I/O error: {0}")]
 	Io(#[from] std::io::Error),
 	#[error("error parsing/building message: {0}")]
