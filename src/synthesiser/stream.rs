@@ -151,8 +151,6 @@ pub fn stream(
 					tracing::error!("unhandled event {t}");
 				}
 			}
-
-			yield UtteranceEvent::AudioChunk(vec![].into_boxed_slice());
 		}
 	}
 }
