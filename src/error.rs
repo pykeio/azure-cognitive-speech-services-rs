@@ -5,8 +5,6 @@ use crate::message::AzureCognitiveSpeechServicesMessageError;
 
 #[derive(Debug, Error)]
 pub enum Error {
-	#[error("bad endpoint URL: {0}")]
-	BadEndpointUrl(#[from] url::ParseError),
 	#[error("invalid key: {0}")]
 	InvalidKey(#[from] InvalidHeaderValue),
 	#[error("websocket error: {0}")]

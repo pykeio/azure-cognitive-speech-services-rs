@@ -7,6 +7,8 @@ use speech_synthesis::{AudioChannels, AudioContainer, AudioEncoding, AudioFormat
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+	tracing_subscriber::fmt::init();
+
 	let region = env::var("ACSS_REGION").expect("define ACSS_REGION");
 	let key = env::var("ACSS_KEY").expect("define ACSS_KEY");
 
@@ -24,13 +26,15 @@ async fn main() -> anyhow::Result<()> {
 		)
 		.unwrap();
 
-	let mut utterance_stream = synthesiser
+	let utterance_config = UtteranceConfig::default();
+	let utterance_stream = synthesiser
 		.synthesise_ssml_stream(
 			ssml::speak(Some("en-US"), [ssml::voice("en-US-JaneNeural", ["This is an example of ACSS in Rust."])]),
 			&format,
-			&UtteranceConfig::default()
+			&utterance_config
 		)
 		.await?;
+	futures_util::pin_mut!(utterance_stream);
 	while let Some(event) = utterance_stream.next().await.transpose()? {
 		if let UtteranceEvent::AudioChunk(audio) = event {
 			queue_input.append(SamplesBuffer::new(
