@@ -2,7 +2,7 @@ use std::env;
 
 use azure_cognitive_speech_services::AzureCognitiveSpeechServicesSynthesiser;
 use futures_util::StreamExt;
-use rodio::{buffer::SamplesBuffer, queue::queue, OutputStream, Sink};
+use rodio::{OutputStream, Sink, buffer::SamplesBuffer, queue::queue};
 use speech_synthesis::{AudioChannels, AudioContainer, AudioEncoding, AudioFormatPreference, SpeechSynthesiser, UtteranceConfig, UtteranceEvent};
 
 #[tokio::main]

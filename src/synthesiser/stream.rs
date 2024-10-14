@@ -4,7 +4,7 @@ use speech_synthesis::{BlendShape, BlendShapeVisemeFrame, UtteranceEvent};
 use tokio::net::TcpStream;
 use tokio_websockets::{MaybeTlsStream, WebSocketStream};
 
-use crate::{message::AzureCognitiveSpeechServicesMessage, Error};
+use crate::{Error, message::AzureCognitiveSpeechServicesMessage};
 
 #[rustfmt::skip]
 const AZURE_BLENDSHAPE_KEYS: [&str; 55] = [

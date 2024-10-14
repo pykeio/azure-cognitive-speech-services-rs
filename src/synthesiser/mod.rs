@@ -188,13 +188,10 @@ impl SpeechSynthesiser for AzureCognitiveSpeechServicesSynthesiser {
 		config: &UtteranceConfig
 	) -> Result<impl speech_synthesis::UtteranceEventStream<Self::Error>, Self::Error> {
 		self.synthesise_ssml_stream(
-			ssml::Speak::new::<ssml::Element, _>(
-				config.voice.as_deref(),
-				[match config.voice.as_ref() {
-					Some(voice) => ssml::voice(voice.as_ref(), [input.as_ref()]).into(),
-					None => input.as_ref().into()
-				}]
-			),
+			ssml::Speak::new::<ssml::Element, _>(config.voice.as_deref(), [match config.voice.as_ref() {
+				Some(voice) => ssml::voice(voice.as_ref(), [input.as_ref()]).into(),
+				None => input.as_ref().into()
+			}]),
 			audio_format,
 			config
 		)
