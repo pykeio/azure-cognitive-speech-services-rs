@@ -24,7 +24,7 @@ pub fn stream(
 ) -> impl Stream<Item = crate::Result<UtteranceEvent>> + Send {
 	let request_id = request_id.to_string();
 
-	async_stream::try_stream! {
+	async_stream_lite::try_async_stream(|r#yield| async move {
 		let mut self_stream_id = None;
 		while let Some(msg) = websocket.next().await {
 			let msg = msg?;
@@ -44,7 +44,7 @@ pub fn stream(
 			match msg.path() {
 				"turn.start" => continue,
 				"turn.end" => break,
-				"audio" => yield UtteranceEvent::AudioChunk(msg.into_body().into_binary().ok_or(Error::ExpectedBinary("audio"))?),
+				"audio" => r#yield(UtteranceEvent::AudioChunk(msg.into_body().into_binary().ok_or(Error::ExpectedBinary("audio"))?)).await,
 				"audio.metadata" => {
 					let data = msg.into_json_abstract()?;
 					let metadata = &data
@@ -76,7 +76,7 @@ pub fn stream(
 						(None, None, None)
 					};
 
-					yield match meta_type {
+					r#yield(match meta_type {
 						"SentenceBoundary" => UtteranceEvent::SentenceBoundary {
 							from_millis: from_millis.unwrap(),
 							to_millis: to_millis.unwrap(),
@@ -125,7 +125,8 @@ pub fn stream(
 							)
 						}
 						a => unimplemented!("{a}")
-					}
+					})
+					.await;
 				}
 				"response" => {
 					let data = msg.into_json_abstract()?;
@@ -152,5 +153,6 @@ pub fn stream(
 				}
 			}
 		}
-	}
+		Ok(())
+	})
 }
