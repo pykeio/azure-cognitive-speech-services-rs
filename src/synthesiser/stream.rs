@@ -24,7 +24,7 @@ pub fn stream(
 ) -> impl Stream<Item = crate::Result<UtteranceEvent>> + Send {
 	let request_id = request_id.to_string();
 
-	async_stream_lite::try_async_stream(|r#yield| async move {
+	async_stream_lite::try_async_stream(|yielder| async move {
 		let mut self_stream_id = None;
 		while let Some(msg) = websocket.next().await {
 			let msg = msg?;
@@ -44,7 +44,11 @@ pub fn stream(
 			match msg.path() {
 				"turn.start" => continue,
 				"turn.end" => break,
-				"audio" => r#yield(UtteranceEvent::AudioChunk(msg.into_body().into_binary().ok_or(Error::ExpectedBinary("audio"))?)).await,
+				"audio" => {
+					yielder
+						.r#yield(UtteranceEvent::AudioChunk(msg.into_body().into_binary().ok_or(Error::ExpectedBinary("audio"))?))
+						.await
+				}
 				"audio.metadata" => {
 					let data = msg.into_json_abstract()?;
 					let metadata = &data
@@ -76,57 +80,58 @@ pub fn stream(
 						(None, None, None)
 					};
 
-					r#yield(match meta_type {
-						"SentenceBoundary" => UtteranceEvent::SentenceBoundary {
-							from_millis: from_millis.unwrap(),
-							to_millis: to_millis.unwrap(),
-							text: text.unwrap().into_boxed_str()
-						},
-						"WordBoundary" => UtteranceEvent::WordBoundary {
-							from_millis: from_millis.unwrap(),
-							to_millis: to_millis.unwrap(),
-							text: text.unwrap().into_boxed_str()
-						},
-						"Viseme" => {
-							// ACSS sends blendshape frames at 60 fps.
-							const FRAME_TICK: f32 = 1000. / 60.;
+					yielder
+						.r#yield(match meta_type {
+							"SentenceBoundary" => UtteranceEvent::SentenceBoundary {
+								from_millis: from_millis.unwrap(),
+								to_millis: to_millis.unwrap(),
+								text: text.unwrap().into_boxed_str()
+							},
+							"WordBoundary" => UtteranceEvent::WordBoundary {
+								from_millis: from_millis.unwrap(),
+								to_millis: to_millis.unwrap(),
+								text: text.unwrap().into_boxed_str()
+							},
+							"Viseme" => {
+								// ACSS sends blendshape frames at 60 fps.
+								const FRAME_TICK: f32 = 1000. / 60.;
 
-							#[derive(serde::Deserialize)]
-							struct AnimationChunk {
-								#[serde(rename = "FrameIndex")]
-								frame_index: usize,
-								#[serde(rename = "BlendShapes")]
-								blend_shapes: Vec<Vec<f32>>
+								#[derive(serde::Deserialize)]
+								struct AnimationChunk {
+									#[serde(rename = "FrameIndex")]
+									frame_index: usize,
+									#[serde(rename = "BlendShapes")]
+									blend_shapes: Vec<Vec<f32>>
+								}
+								let mut chunk = metadata
+									.get_str("AnimationChunk")
+									.ok_or(Error::MissingField("AnimationChunk", "`audio.metadata` event"))?
+									.to_string();
+								let animation_chunk: AnimationChunk = unsafe { simd_json::from_str(&mut chunk) }?;
+
+								let offset_ms = animation_chunk.frame_index as f32 * FRAME_TICK;
+								UtteranceEvent::BlendShapeVisemesChunk(
+									animation_chunk
+										.blend_shapes
+										.into_iter()
+										.enumerate()
+										.map(|(i, keys)| BlendShapeVisemeFrame {
+											frame_offset: offset_ms + (i as f32 * FRAME_TICK),
+											blendshapes: keys
+												.into_iter()
+												.enumerate()
+												.map(|(i, weight)| BlendShape {
+													key: AZURE_BLENDSHAPE_KEYS[i].into(),
+													weight
+												})
+												.collect()
+										})
+										.collect()
+								)
 							}
-							let mut chunk = metadata
-								.get_str("AnimationChunk")
-								.ok_or(Error::MissingField("AnimationChunk", "`audio.metadata` event"))?
-								.to_string();
-							let animation_chunk: AnimationChunk = unsafe { simd_json::from_str(&mut chunk) }?;
-
-							let offset_ms = animation_chunk.frame_index as f32 * FRAME_TICK;
-							UtteranceEvent::BlendShapeVisemesChunk(
-								animation_chunk
-									.blend_shapes
-									.into_iter()
-									.enumerate()
-									.map(|(i, keys)| BlendShapeVisemeFrame {
-										frame_offset: offset_ms + (i as f32 * FRAME_TICK),
-										blendshapes: keys
-											.into_iter()
-											.enumerate()
-											.map(|(i, weight)| BlendShape {
-												key: AZURE_BLENDSHAPE_KEYS[i].into(),
-												weight
-											})
-											.collect()
-									})
-									.collect()
-							)
-						}
-						a => unimplemented!("{a}")
-					})
-					.await;
+							a => unimplemented!("{a}")
+						})
+						.await;
 				}
 				"response" => {
 					let data = msg.into_json_abstract()?;

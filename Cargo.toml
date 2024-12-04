@@ -14,7 +14,7 @@ simd-json = "0.14"
 tokio = { version = "1.40", features = [ "net" ] }
 tokio-websockets = { version = "0.10", features = [ "client" ] }
 ssml = "0.1"
-async-stream-lite = "0.1"
+async-stream-lite = "0.2"
 thiserror = "1.0"
 tracing = "0.1"
 http = "1.0"
