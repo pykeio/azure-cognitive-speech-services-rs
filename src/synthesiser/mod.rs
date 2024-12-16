@@ -6,6 +6,7 @@ use tokio_websockets::ClientBuilder;
 
 mod stream;
 use super::message::AzureCognitiveSpeechServicesMessage;
+use crate::Error;
 
 #[derive(Clone)]
 pub struct AzureCognitiveSpeechServicesSynthesiser {
@@ -29,6 +30,23 @@ impl AzureCognitiveSpeechServicesSynthesiser {
 			.uri(self.endpoint.as_str())
 			.unwrap()
 			.add_header(HeaderName::from_static("ocp-apim-subscription-key"), self.key.clone()))
+	}
+
+	fn name_for_format(format: &AudioFormat) -> Option<&str> {
+		match (format.container(), format.sample_rate(), format.channels()) {
+			(AudioContainer::Raw(AudioEncoding::ALaw), 8000, AudioChannels::Mono) => Some("raw-8khz-8bit-mono-alaw"),
+			(AudioContainer::Raw(AudioEncoding::MuLaw), 8000, AudioChannels::Mono) => Some("raw-8khz-8bit-mono-mulaw"),
+			(AudioContainer::Raw(AudioEncoding::Pcm), 8000, AudioChannels::Mono) => Some("raw-8khz-16bit-mono-pcm"),
+			(AudioContainer::Raw(AudioEncoding::Pcm), 16000, AudioChannels::Mono) => Some("raw-16khz-16bit-mono-pcm"),
+			(AudioContainer::Raw(AudioEncoding::Pcm), 22050, AudioChannels::Mono) => Some("raw-22050khz-16bit-mono-pcm"),
+			(AudioContainer::Raw(AudioEncoding::Pcm), 24000, AudioChannels::Mono) => Some("raw-24khz-16bit-mono-pcm"),
+			(AudioContainer::Raw(AudioEncoding::Pcm), 44100, AudioChannels::Mono) => Some("raw-44100khz-16bit-mono-pcm"),
+			(AudioContainer::Raw(AudioEncoding::Pcm), 48000, AudioChannels::Mono) => Some("raw-48khz-16bit-mono-pcm"),
+			(AudioContainer::Ogg(AudioCodec::Opus), 16000, AudioChannels::Mono) => Some("ogg-16khz-16bit-mono-opus"),
+			(AudioContainer::Ogg(AudioCodec::Opus), 24000, AudioChannels::Mono) => Some("ogg-24khz-16bit-mono-opus"),
+			(AudioContainer::Ogg(AudioCodec::Opus), 48000, AudioChannels::Mono) => Some("ogg-48khz-16bit-mono-opus"),
+			_ => None
+		}
 	}
 }
 
@@ -73,45 +91,43 @@ impl SpeechSynthesiser for AzureCognitiveSpeechServicesSynthesiser {
 					if channels.is_some() && !channels.unwrap().iter().any(|c| c == &AudioChannels::Mono) {
 						None
 					} else {
-						let (name, sample_rate, channels) = sample_rates
-							.map(|c| {
-								for c in c.iter().copied() {
-									match (c, encoding) {
-										(8_000, AudioEncoding::ALaw) => return Some(("raw-8khz-8bit-mono-alaw", c, AudioChannels::Mono)),
-										(8_000, AudioEncoding::MuLaw) => return Some(("raw-8khz-8bit-mono-mulaw", c, AudioChannels::Mono)),
-										(8_000, AudioEncoding::Pcm) => return Some(("raw-8khz-16bit-mono-pcm", c, AudioChannels::Mono)),
-										(16_000, AudioEncoding::Pcm) => return Some(("raw-16khz-16bit-mono-pcm", c, AudioChannels::Mono)),
-										(22_050, AudioEncoding::Pcm) => return Some(("raw-22050hz-16bit-mono-pcm", c, AudioChannels::Mono)),
-										(24_000, AudioEncoding::Pcm) => return Some(("raw-24khz-16bit-mono-pcm", c, AudioChannels::Mono)),
-										(44_100, AudioEncoding::Pcm) => return Some(("raw-44100hz-16bit-mono-pcm", c, AudioChannels::Mono)),
-										(48_000, AudioEncoding::Pcm) => return Some(("raw-48khz-16bit-mono-pcm", c, AudioChannels::Mono)),
+						let sample_rate = sample_rates
+							.map(|sr_prefs| {
+								for sr in sr_prefs.iter().copied() {
+									match (sr, encoding) {
+										(8_000, AudioEncoding::ALaw) => return Some(sr),
+										(8_000, AudioEncoding::MuLaw) => return Some(sr),
+										(8_000, AudioEncoding::Pcm) => return Some(sr),
+										(16_000, AudioEncoding::Pcm) => return Some(sr),
+										(22_050, AudioEncoding::Pcm) => return Some(sr),
+										(24_000, AudioEncoding::Pcm) => return Some(sr),
+										(44_100, AudioEncoding::Pcm) => return Some(sr),
+										(48_000, AudioEncoding::Pcm) => return Some(sr),
 										_ => continue
 									};
 								}
 								None
 							})
-							.unwrap_or(Some(("raw-48khz-16bit-mono-pcm", 48_000, AudioChannels::Mono)))?;
-						Some(AudioFormat::new_named(name, sample_rate, channels, None, container))
+							.unwrap_or(Some(48_000))?;
+						Some(AudioFormat::new(sample_rate, AudioChannels::Mono, None, container))
 					}
 				}
 				AudioContainer::Ogg(AudioCodec::Opus) => {
 					if channels.is_some() && !channels.unwrap().iter().any(|c| c == &AudioChannels::Mono) {
 						None
 					} else {
-						let (name, sample_rate, channels) = sample_rates
-							.map(|c| {
-								for c in c.iter().copied() {
-									match c {
-										16_000 => return Some(("ogg-16khz-16bit-mono-opus", c, AudioChannels::Mono)),
-										24_000 => return Some(("ogg-24khz-16bit-mono-opus", c, AudioChannels::Mono)),
-										48_000 => return Some(("ogg-48khz-16bit-mono-opus", c, AudioChannels::Mono)),
+						let sample_rate = sample_rates
+							.map(|sr_prefs| {
+								for sr in sr_prefs.iter().copied() {
+									match sr {
+										16_000 | 24_000 | 48_000 => return Some(sr),
 										_ => continue
 									};
 								}
 								None
 							})
-							.unwrap_or(Some(("ogg-48khz-16bit-mono-opus", 48_000, AudioChannels::Mono)))?;
-						Some(AudioFormat::new_named(name, sample_rate, channels, None, container))
+							.unwrap_or(Some(48_000))?;
+						Some(AudioFormat::new(sample_rate, AudioChannels::Mono, None, container))
 					}
 				}
 				// TODO: other formats
@@ -127,13 +143,13 @@ impl SpeechSynthesiser for AzureCognitiveSpeechServicesSynthesiser {
 			}
 			None
 		} else {
-			Some(AudioFormat::new_named("raw-48khz-16bit-mono-pcm", 48_000, AudioChannels::Mono, None, AudioContainer::Raw(AudioEncoding::Pcm)))
+			Some(AudioFormat::new(48_000, AudioChannels::Mono, None, AudioContainer::Raw(AudioEncoding::Pcm)))
 		}
 	}
 
 	async fn synthesise_ssml_stream(
 		&self,
-		input: ssml::Speak,
+		input: ssml::Speak<'_>,
 		audio_format: &AudioFormat,
 		config: &UtteranceConfig
 	) -> Result<impl Stream<Item = crate::Result<UtteranceEvent>>, Self::Error> {
@@ -162,7 +178,7 @@ impl SpeechSynthesiser for AzureCognitiveSpeechServicesSynthesiser {
 						r#"{{"synthesis":{{"audio":{{"metadataOptions":{{"sentenceBoundaryEnabled":{},"wordBoundaryEnabled":{},"sessionEndEnabled":false}},"outputFormat":"{}"}}}}}}"#,
 						config.emit_sentence_boundary_events,
 						config.emit_word_boundary_events,
-						audio_format.name().unwrap()
+						Self::name_for_format(audio_format).ok_or(Error::UnsupportedAudioFormat)?
 					))
 					.build()?
 					.into_websocket_message()
@@ -189,8 +205,8 @@ impl SpeechSynthesiser for AzureCognitiveSpeechServicesSynthesiser {
 	) -> Result<impl speech_synthesis::UtteranceEventStream<Self::Error>, Self::Error> {
 		self.synthesise_ssml_stream(
 			ssml::Speak::new::<ssml::Element, _>(config.voice.as_deref(), [match config.voice.as_ref() {
-				Some(voice) => ssml::voice(voice.as_ref(), [input.as_ref()]).into(),
-				None => input.as_ref().into()
+				Some(voice) => ssml::voice(voice.as_ref(), [input.as_ref().to_string()]).into(),
+				None => input.as_ref().to_string().into()
 			}]),
 			audio_format,
 			config
@@ -212,7 +228,10 @@ mod tests {
 			.with_prefer_containers([AudioContainer::Raw(AudioEncoding::Pcm), AudioContainer::Ogg(AudioCodec::Opus)])
 			.with_prefer_channels([AudioChannels::Mono])
 			.with_prefer_sample_rates([8_000, 16_000, 22_050, 24_000, 44_100]);
-		assert_eq!(synthesiser.negotiate_audio_format(pref).unwrap().name(), Some("raw-44100hz-16bit-mono-pcm"));
+		let negotiated_format = synthesiser.negotiate_audio_format(pref).unwrap();
+		assert_eq!(negotiated_format.container(), AudioContainer::Raw(AudioEncoding::Pcm));
+		assert_eq!(negotiated_format.sample_rate(), 44100);
+		assert_eq!(negotiated_format.channels(), AudioChannels::Mono);
 		Ok(())
 	}
 }

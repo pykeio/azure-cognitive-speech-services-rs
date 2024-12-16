@@ -22,7 +22,9 @@ pub enum Error {
 	#[error("failed to deserialize: {0}")]
 	Deserialize(#[from] simd_json::Error),
 	#[error("unexpected multiple streams in request")]
-	UnexpectedMultipleStreams
+	UnexpectedMultipleStreams,
+	#[error("unsupported audio format")]
+	UnsupportedAudioFormat
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;

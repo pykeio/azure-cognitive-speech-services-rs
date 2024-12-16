@@ -13,14 +13,14 @@ serde = "1.0"
 simd-json = "0.14"
 tokio = { version = "1.40", features = [ "net" ] }
 tokio-websockets = { version = "0.10", features = [ "client" ] }
-ssml = "0.1"
+ssml = "0.2"
 async-stream-lite = "0.2"
-thiserror = "1.0"
+thiserror = "2.0"
 tracing = "0.1"
 http = "1.0"
 bytes = "1.7"
 uuid = { version = "1.4", features = [ "v4", "fast-rng" ] }
-speech-synthesis = "0.2"
+speech-synthesis = "0.3"
 futures-util = { version = "0.3", default-features = false, features = [ "sink", "std" ] }
 
 [features]
