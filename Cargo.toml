@@ -1,6 +1,6 @@
 [package]
 name = "azure-cognitive-speech-services"
-version = "0.0.8"
+version = "0.0.9"
 rust-version = "1.75"
 edition = "2021"
 authors = ["pyke.io <contact@pyke.io>"]
