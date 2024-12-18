@@ -19,8 +19,8 @@ async fn main() -> anyhow::Result<()> {
 	let synthesiser = AzureCognitiveSpeechServicesSynthesiser::new(region, key).await?;
 	let format = synthesiser
 		.negotiate_audio_format(
-			AudioFormatPreference::default()
-				.with_prefer_containers([AudioContainer::Raw(AudioEncoding::Pcm)])
+			&AudioFormatPreference::default()
+				.with_prefer_containers([AudioContainer::Raw(AudioEncoding::PcmI16)])
 				.with_prefer_channels([AudioChannels::Mono])
 				.with_prefer_sample_rates([48_000])
 		)
@@ -29,7 +29,7 @@ async fn main() -> anyhow::Result<()> {
 	let utterance_config = UtteranceConfig::default();
 	let utterance_stream = synthesiser
 		.synthesise_ssml_stream(
-			ssml::speak(Some("en-US"), [ssml::voice("en-US-JaneNeural", ["This is an example of ACSS in Rust."])]),
+			&ssml::speak(Some("en-US"), [ssml::voice("en-US-JaneNeural", ["This is an example of ACSS in Rust."])]),
 			&format,
 			&utterance_config
 		)

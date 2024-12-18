@@ -20,7 +20,7 @@ tracing = "0.1"
 http = "1.0"
 bytes = "1.7"
 uuid = { version = "1.4", features = [ "v4", "fast-rng" ] }
-speech-synthesis = "0.3"
+speech-synthesis = "0.4"
 futures-util = { version = "0.3", default-features = false, features = [ "sink", "std" ] }
 
 [features]

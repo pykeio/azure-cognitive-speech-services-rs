@@ -21,7 +21,7 @@ const AZURE_BLENDSHAPE_KEYS: [&str; 55] = [
 pub fn stream(
 	request_id: impl ToString,
 	mut websocket: WebSocketStream<MaybeTlsStream<TcpStream>>
-) -> impl Stream<Item = crate::Result<UtteranceEvent>> + Send {
+) -> impl Stream<Item = crate::Result<UtteranceEvent>> + Send + 'static {
 	let request_id = request_id.to_string();
 
 	async_stream_lite::try_async_stream(|yielder| async move {
