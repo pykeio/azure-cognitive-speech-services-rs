@@ -82,6 +82,17 @@ pub fn stream(
 
 					yielder
 						.r#yield(match meta_type {
+							"Bookmark" => UtteranceEvent::SsmlMark {
+								at_millis: metadata
+									.get_u64("Offset")
+									.map(|o| o as f32 / 10_000.)
+									.ok_or(Error::MissingField("Offset", "`audio.metadata` event"))?,
+								mark: metadata
+									.get_str("Bookmark")
+									.ok_or(Error::MissingField("Bookmark", "`audio.metadata` event"))?
+									.to_string()
+									.into_boxed_str()
+							},
 							"SentenceBoundary" => UtteranceEvent::SentenceBoundary {
 								from_millis: from_millis.unwrap(),
 								to_millis: to_millis.unwrap(),

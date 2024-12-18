@@ -76,7 +76,7 @@ impl AzureCognitiveSpeechServicesSynthesiser {
 				AzureCognitiveSpeechServicesMessage::builder("synthesis.context", &request_id)
 					.with_content_type(AzureCognitiveSpeechServicesMessage::CONTENT_TYPE_JSON)
 					.with_body(format!(
-						r#"{{"synthesis":{{"audio":{{"metadataOptions":{{"sentenceBoundaryEnabled":{},"wordBoundaryEnabled":{},"sessionEndEnabled":false}},"outputFormat":"{}"}}}}}}"#,
+						r#"{{"synthesis":{{"audio":{{"metadataOptions":{{"sentenceBoundaryEnabled":{},"wordBoundaryEnabled":{},"bookmarkEnabled":true,"sessionEndEnabled":false}},"outputFormat":"{}"}}}}}}"#,
 						config.emit_sentence_boundary_events,
 						config.emit_word_boundary_events,
 						Self::name_for_format(audio_format).ok_or(Error::UnsupportedAudioFormat)?
