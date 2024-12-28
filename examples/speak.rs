@@ -16,7 +16,7 @@ async fn main() -> anyhow::Result<()> {
 	let sink = Sink::try_new(&stream_handle)?;
 	let (queue_input, queue_output) = queue::<i16>(false);
 
-	let synthesiser = AzureCognitiveSpeechServicesSynthesiser::new(region, key).await?;
+	let synthesiser = AzureCognitiveSpeechServicesSynthesiser::new(region, key);
 	let format = synthesiser
 		.negotiate_audio_format(
 			&AudioFormatPreference::default()

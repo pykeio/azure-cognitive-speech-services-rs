@@ -18,11 +18,11 @@ unsafe impl Sync for AzureCognitiveSpeechServicesSynthesiser {}
 unsafe impl Send for AzureCognitiveSpeechServicesSynthesiser {}
 
 impl AzureCognitiveSpeechServicesSynthesiser {
-	pub async fn new(region: impl AsRef<str>, key: impl AsRef<str>) -> crate::Result<Self> {
-		Ok(Self {
+	pub fn new(region: impl AsRef<str>, key: impl AsRef<str>) -> Self {
+		Self {
 			endpoint: format!("wss://{}.tts.speech.microsoft.com/cognitiveservices/websocket/v1", region.as_ref()),
-			key: HeaderValue::from_str(key.as_ref())?
-		})
+			key: HeaderValue::from_str(key.as_ref()).expect("invalid key")
+		}
 	}
 
 	fn build_client(&self) -> crate::Result<ClientBuilder> {
@@ -227,9 +227,9 @@ mod tests {
 
 	use super::*;
 
-	#[tokio::test]
-	async fn test_pref() -> crate::Result<()> {
-		let synthesiser = AzureCognitiveSpeechServicesSynthesiser::new("dummy", "dummy").await?;
+	#[test]
+	fn test_pref() -> crate::Result<()> {
+		let synthesiser = AzureCognitiveSpeechServicesSynthesiser::new("dummy", "dummy");
 		let pref = AudioFormatPreference::default()
 			.with_prefer_containers([AudioContainer::Raw(AudioEncoding::PcmI16), AudioContainer::Ogg(AudioCodec::Opus)])
 			.with_prefer_channels([AudioChannels::Mono])
